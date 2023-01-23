@@ -5,12 +5,22 @@ import scipy.io
 import os
 
 import numpy as np
+import cv2
+from skimage.feature import hog, daisy
 
 if torch.__version__ == "1.2.0":
     from torchvision.models.utils import load_state_dict_from_url
 else:
     from torch.utils.model_zoo import load_url
 
+class FEATURES:
+    GRAYSCALE = 1
+    RGB = 2
+    HOG = 3
+    DAISY = 4
+    ALEXNET = 5
+
+FEATURES_NAMES = {1: 'GRAYSCALE', 2: 'RGB', 3: 'HOG', 4: 'DAISY', 5: 'ALEXNET'}
 
 COLOR_NAMES = ['black', 'blue', 'brown', 'grey', 'green', 'orange',
                'pink', 'purple', 'red', 'white', 'yellow']
@@ -20,6 +30,44 @@ COLOR_RGB = [[0, 0, 0] , [0, 0, 1], [.5, .4, .25] , [.5, .5, .5] , [0, 1, 0] , [
 COLORNAMES_TABLE_PATH = os.path.join(os.path.dirname(__file__), 'colornames_w2c.mat')
 COLORNAMES_TABLE = scipy.io.loadmat(COLORNAMES_TABLE_PATH)['w2c']
 
+
+def extract_features(image_color, feature_type):
+    if feature_type == FEATURES.GRAYSCALE:
+        image = np.sum(image_color, 2) / 3
+    elif feature_type == FEATURES.RGB:
+        image = image_color
+    elif feature_type == FEATURES.HOG:
+        fd = hog(image_color,
+                 orientations=8,
+                 pixels_per_cell=(16, 16),
+                 cells_per_block=(1, 1),
+                 feature_vector=False,
+                 channel_axis=-1,)
+        image = fd.reshape(fd.shape[0], fd.shape[1], -1)
+        image = cv2.resize(image, dsize=image_color.shape[:2])
+    elif feature_type == FEATURES.DAISY:
+        fd = daisy(np.sum(image_color, 2) / 3,
+                    step=1,
+                    radius=15,
+                    rings=1,
+                    histograms=2,
+                    orientations=4)
+        image = fd.reshape(fd.shape[0], fd.shape[1], -1)
+        image = cv2.resize(image, dsize=image_color.shape[:2])
+    elif feature_type == FEATURES.ALEXNET:
+        raise NotImplementedError
+    else:
+        raise NotImplementedError
+    return image
+
+
+def features_to_image(feat, cmap=None):
+    feat = ((feat - feat.min()) / (feat.max() - feat.min()) * 255).astype(np.uint8)
+    if cmap is None:
+        feat = cv2.cvtColor(feat, cv2.COLOR_GRAY2RGB)
+    else:
+        feat = cv2.applyColorMap(feat, cmap)
+    return feat
 
 def colornames_image(image, mode='probability'):
     """Apply color names to an image
