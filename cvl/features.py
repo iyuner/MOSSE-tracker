@@ -19,8 +19,9 @@ class FEATURES:
     HOG = 3
     DAISY = 4
     ALEXNET = 5
+    COLORNAMES = 6
 
-FEATURES_NAMES = {1: 'GRAYSCALE', 2: 'RGB', 3: 'HOG', 4: 'DAISY', 5: 'ALEXNET'}
+FEATURES_NAMES = {1: 'GRAYSCALE', 2: 'RGB', 3: 'HOG', 4: 'DAISY', 5: 'ALEXNET', 6: 'COLORNAMES'}
 
 COLOR_NAMES = ['black', 'blue', 'brown', 'grey', 'green', 'orange',
                'pink', 'purple', 'red', 'white', 'yellow']
@@ -44,7 +45,7 @@ def extract_features(image_color, feature_type):
                  feature_vector=False,
                  channel_axis=-1,)
         image = fd.reshape(fd.shape[0], fd.shape[1], -1)
-        image = cv2.resize(image, dsize=image_color.shape[:2])
+        image = cv2.resize(image, dsize=image_color.shape[1::-1])
     elif feature_type == FEATURES.DAISY:
         fd = daisy(np.sum(image_color, 2) / 3,
                     step=1,
@@ -53,7 +54,9 @@ def extract_features(image_color, feature_type):
                     histograms=2,
                     orientations=4)
         image = fd.reshape(fd.shape[0], fd.shape[1], -1)
-        image = cv2.resize(image, dsize=image_color.shape[:2])
+        image = cv2.resize(image, dsize=image_color.shape[1::-1])
+    elif feature_type == FEATURES.COLORNAMES:
+        image = colornames_image(image_color, mode='probability')
     elif feature_type == FEATURES.ALEXNET:
         raise NotImplementedError
     else:
