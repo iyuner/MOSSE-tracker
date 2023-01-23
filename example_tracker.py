@@ -21,6 +21,11 @@ def fit_size(img, tsize=None, fit_height=True):
     img = cv2.resize(img, dsize=dsize)
     return img
 
+def draw_bbox(img, bbox, color=(0, 255, 0)):
+    pt0 = (bbox.xpos, bbox.ypos)
+    pt1 = (bbox.xpos + bbox.width, bbox.ypos + bbox.height)
+    cv2.rectangle(img, pt0, pt1, color=color, thickness=3)
+
 
 if __name__ == "__main__":
 
@@ -54,11 +59,14 @@ if __name__ == "__main__":
         if DEBUG:
             N_CHANNELS = 4
             bbox = tracker.region
-            pt0 = (bbox.xpos, bbox.ypos)
-            pt1 = (bbox.xpos + bbox.width, bbox.ypos + bbox.height)
+            gt_bbox = frame['bounding_box']
             image_bgr = cv2.cvtColor(image_color, cv2.COLOR_RGB2BGR)
             image_wbox = cv2.cvtColor(image_color, cv2.COLOR_RGB2BGR)
-            cv2.rectangle(image_wbox, pt0, pt1, color=(0, 255, 0), thickness=3)
+            draw_bbox(image_wbox, gt_bbox, color=(0, 255, 0))
+            draw_bbox(image_wbox, bbox, color=(255, 0, 0))
+            union = gt_bbox.union_box(bbox).area()
+            intersection = gt_bbox.intersection_box(bbox).area()
+            print(f'iou = {intersection / union:.2f}')
             if tracker.last_response is None:
                 image_top = image_wbox
                 template = fit_size(tracker.crop_patch(image_bgr), tsize=image_wbox.shape[:2], fit_height=True,)
@@ -79,16 +87,13 @@ if __name__ == "__main__":
                 exit()
 
         elif SHOW_TRACKING:
-            bbox = tracker.region
-            pt0 = (bbox.xpos, bbox.ypos)
-            pt1 = (bbox.xpos + bbox.width, bbox.ypos + bbox.height)
             image_color = cv2.cvtColor(image_color, cv2.COLOR_RGB2BGR)
-            cv2.rectangle(image_color, pt0, pt1, color=(0, 255, 0), thickness=3)
+            draw_bbox(image_color, tracker.region, color=(0, 255, 0))
             cv2.imshow("tracker", image_color)
             key = cv2.waitKey(0)
             if key==ord('q'):
                 exit()
             if key==ord('s'):
-                filename = f"./results/NCC_{FEATURES_NAMES[FEATURE_TYPE]}_s{SEQUENCE_IDX:02}_f{frame_idx:04}.jpg"
+                filename = f"./results/{tracker.__class__.__name__}_{FEATURES_NAMES[FEATURE_TYPE]}_s{SEQUENCE_IDX:02}_f{frame_idx:04}.jpg"
                 cv2.imwrite(filename, image_color)
 
