@@ -75,6 +75,10 @@ class NCCTracker:
         self.region.xpos += c_offset
         self.region.ypos += r_offset
 
+        height, width = image.shape[:2]
+        self.region.xpos = min(width, max(0,self.region.xpos))
+        self.region.ypos = min(height, max(0,self.region.ypos))
+
         return self.region
 
     def update(self, image, lr=0.1):
