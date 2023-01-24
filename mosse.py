@@ -33,6 +33,8 @@ class MOSSETracker():
             image = self.preprocess(image)
             # clip the image to the size of the bounding box from the previous frame
             image = self.clip_the_image(image, bb)
+            image = cv2.resize(image, (bb[2], bb[3]))
+
             # multiply the filter H by the fourier transform of the image
             G = H * np.fft.fft2(image)
             G = self.linear_mapping(np.fft.ifft2(G))
@@ -43,11 +45,11 @@ class MOSSETracker():
             # get the coordinates of the top left corner of the bounding box
             # the coordinates are calculated using the coordinates of the maximum value
             # and the size of the bounding box
-            print(max_val_pos)
+            print(G)
             x = max_val_pos[1][0] - bb[2] // 2
             y = max_val_pos[0][0] - bb[3] // 2
             # create a new bounding box
-            new_bb = [x, y, bb[2], bb[3]]
+            bb = [x, y, bb[2], bb[3]]
             # save the new bounding box to the list of bounding boxes
             self.predicted_bounding_boxes.append(new_bb)
             # if verbose is True, show the image with the bounding box
@@ -80,9 +82,10 @@ class MOSSETracker():
         # all the pixels are transformed using log function
         # trun image to grayscale
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        image = np.log(image + 1)
+        image = np.log(image +1)
+        image = (image - np.mean(image)) / (np.std(image) + 1e-5)
+        print(np.min(image))
         # the image is normalized
-        image = (image - np.mean(image)) / np.std(image)
         # the image is multiplied by a cosine window to reduce the effect of the border
         image = image * np.outer(np.hanning(image.shape[0]), np.hanning(image.shape[1]))
         return image
@@ -102,7 +105,9 @@ class MOSSETracker():
         # cut out the region of interest from the first image 
         x, y, w, h = self.bounding_boxes[i]
         G = first_img[y:y+h, x:x+w]
-        first_img = self.clip_the_image(first_img, step = i)
+        # get gaussian response
+        # G = self._get_gauss_response(self, img, gt)
+        # first_img = self.clip_the_image(first_img, step = i)
         # resize first image to the size of the ground truth
         first_img = cv2.resize(first_img, (w, h))
         # normalize image   
@@ -116,6 +121,23 @@ class MOSSETracker():
         top = G * np.conj(first_img)
         bottom = first_img * np.conj(first_img)
         return top, bottom
+
+
+    def _get_gauss_response(self, img, gt):
+        # get the shape of the image..
+        height, width = img.shape
+        # get the mesh grid...
+        xx, yy = np.meshgrid(np.arange(width), np.arange(height))
+        # get the center of the object...
+        center_x = gt[0] + 0.5 * gt[2]
+        center_y = gt[1] + 0.5 * gt[3]
+        # cal the distance...
+        dist = (np.square(xx - center_x) + np.square(yy - center_y)) / (2 * self.args.sigma)
+        # get the response map...
+        response = np.exp(-dist)
+        # normalize...
+        response = self.linear_mapping(response)
+        return response
 
     def pretrain(self, lr = 0.125):
         # pretrain the tracker using the first n_steps frames of the video
