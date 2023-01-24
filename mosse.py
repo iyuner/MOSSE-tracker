@@ -8,7 +8,7 @@ class MOSSETracker():
     def __init__(self):
         self._tracker = cv2.TrackerMOSSE_create()
         self._is_initialized = False
-
+        self.path = "../Mini-OTB"
     def start(self, image, bbox):
         self._is_initialized = self._tracker.init(image, bbox)
 
@@ -20,8 +20,17 @@ class MOSSETracker():
         return bbox
     def update(self):
         pass
-    
-    
+
+    def preprocess(self, image):
+        # all the pixels are transformed using log function
+        image = np.log(image + 1)
+        # the image is normalized
+        image = (image - np.mean(image)) / np.std(image)
+        # the image is multiplied by a cosine window to reduce the effect of the border
+        image = image * np.outer(np.hanning(image.shape[0]), np.hanning(image.shape[1]))
+        return image
+        
+
     @property
     def region(self):
         if not self._is_initialized:
