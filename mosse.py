@@ -1,6 +1,6 @@
 import cv2 
 import numpy as np
-
+import os
 # create mosse tracker
 
 class MOSSETracker():
@@ -9,8 +9,8 @@ class MOSSETracker():
         self._tracker = cv2.TrackerMOSSE_create()
         self._is_initialized = False
         self.path = "../Mini-OTB"
-        self.first_img = cv2.imread(self.path + "../Basketball/img/0001.jpg") 
-        self.annot_file = self.path + "../anno/Basketball.txt"
+        self.images_path = self.path + "/Basketball/img"
+        self.annot_file = self.path + "/anno/Basketball.txt"
         self.n_steps = 1
         self.bounding_boxes = []
         self.get_bb()
@@ -24,6 +24,7 @@ class MOSSETracker():
 
         self._is_initialized, bbox = self._tracker.update(image)
         return bbox
+        
     def update(self):
         pass
 
@@ -36,12 +37,15 @@ class MOSSETracker():
         image = image * np.outer(np.hanning(image.shape[0]), np.hanning(image.shape[1]))
         return image
 
-    def pretrain_setup(self, first_img):
+    def pretrain_step(self, i):
         # first image is the first frame of the video
         # G is the ground truth bounding box
-        # function outputs components of filter H - Ai and Bi
+        # function outputs components of filter H - Ai and Bi   
+        # first_image - read image i from self.images_path
+        image_name = os.listdir(self.images_path)[i]
+        first_img = cv2.imread(os.path.join(self.images_path, image_name))
         # cut out the region of interest from the first image 
-        x, y, w, h = self.bounding_boxes[0]
+        x, y, w, h = self.bounding_boxes[i]
         G = first_img[y:y+h, x:x+w]
         # resize first image to the size of the ground truth
         first_img = cv2.resize(first_img, (w, h))
@@ -53,10 +57,20 @@ class MOSSETracker():
         G = np.fft.fft2(G, s=first_img.shape)
         #  # create a filter H 
         # elementwise multiplication of the fourier transform of the image and the fourier transform of the ground truth
-        Ai = G * np.conj(first_img)
-        Bi = first_img * np.conj(first_img)
-        return Ai, Bi
-    
+        top = G * np.conj(first_img)
+        bottom = first_img * np.conj(first_img)
+        return top, bottom
+
+    def pretrain(self, lr = 0.125):
+        # pretrain the tracker using the first n_steps frames of the video
+        Ai, Bi = self.pretrain_setup(self.first_img, self.G)
+        for i in range(self.n_steps):
+            top,bottom = self.pretrain_step(i)
+            Ai = lr * top + (1 - lr) * Ai
+            Bi = lr * bottom + (1 - lr) * Bi
+        # return the filter H
+        return Ai / Bi
+        
     def get_bb(self):
         # read n_steps lines from the annotation file and save to the list of bounding boxes
         # each line contains 4 numbers - x, y, width, height
@@ -70,20 +84,5 @@ class MOSSETracker():
                 # separate the numbers in the line and convert them to integers
                 line = [int(x) for x in line.split(',')]
                 self.bounding_boxes.append(line)
-
-    def pretrain(self, lr = 0.125):
-
-        Ai, Bi = self.pretrain_setup(self.first_img, self.G)
-        
-    @property
-    def region(self):
-        if not self._is_initialized:
-            raise RuntimeError("Tracker not initialized")
-
-        return self._tracker.getObjects()[0]
-
-    @property
-    def is_initialized(self):
-        return self._is_initialized
 
 tracker = mosse.MOSSETracker()
