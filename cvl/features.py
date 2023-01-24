@@ -7,7 +7,7 @@ import os
 import numpy as np
 import cv2
 from skimage.feature import hog, daisy
-
+from torchvision import transforms
 if torch.__version__ == "1.2.0":
     from torchvision.models.utils import load_state_dict_from_url
 else:
@@ -31,7 +31,13 @@ COLOR_RGB = [[0, 0, 0] , [0, 0, 1], [.5, .4, .25] , [.5, .5, .5] , [0, 1, 0] , [
 COLORNAMES_TABLE_PATH = os.path.join(os.path.dirname(__file__), 'colornames_w2c.mat')
 COLORNAMES_TABLE = scipy.io.loadmat(COLORNAMES_TABLE_PATH)['w2c']
 
-
+model = None
+transform = transforms.Compose(
+    [
+        transforms.ToTensor(),
+         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 def extract_features(image_color, feature_type):
     if feature_type == FEATURES.GRAYSCALE:
         image = np.sum(image_color, 2) / 3
@@ -58,7 +64,14 @@ def extract_features(image_color, feature_type):
     elif feature_type == FEATURES.COLORNAMES:
         image = colornames_image(image_color, mode='probability')
     elif feature_type == FEATURES.ALEXNET:
-        raise NotImplementedError
+        global model
+        if model==None:
+            model = alexnetFeatures(True)#.to(device) # For some reason, gpu inference not working, may have to do with conda env
+        image = torch.unsqueeze(transform(image_color),0)
+        image = image#.to(device)
+        with torch.no_grad():
+            image = torch.squeeze(model(image,0)).permute(1,2,0).cpu().numpy()
+        image = cv2.resize(image, dsize=image_color.shape[1::-1])
     else:
         raise NotImplementedError
     return image
@@ -137,9 +150,10 @@ class AlexNetFeature(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(4096, num_classes),
         )
-
-    def forward(self, x):
-        x = self.features(x)
+        self.conv_indexes = [1,4,7,9,11]
+        
+    def forward(self, x, conv_index=0):
+        x = self.features[:self.conv_indexes[conv_index]](x)
         return x
 
 

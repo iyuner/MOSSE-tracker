@@ -16,7 +16,7 @@ SHOW_PER_SEQUENCE_AUC = True
 SHOW_FULL_AUC = False
 REEVAL = False
 
-FEATURES_LIST = [FEATURES.GRAYSCALE, FEATURES.RGB, FEATURES.COLORNAMES, FEATURES.HOG, FEATURES.DAISY]
+FEATURES_LIST = [FEATURES.GRAYSCALE, FEATURES.RGB, FEATURES.COLORNAMES, FEATURES.HOG, FEATURES.DAISY,FEATURES.ALEXNET]
 
 def evaluate_method_on_sequence(tracker, feature_type, dataset, sequence_idx):
     print(f"{sequence_idx}: {dataset.sequence_names[sequence_idx]}")
