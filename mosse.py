@@ -1,14 +1,14 @@
 import cv2 
 import numpy as np
-import os
+import os, re, sys
 # create mosse tracker
 
 class MOSSETracker():
     
-    def __init__(self):
+    def __init__(self, trail = "Basketball"):
         self.path = "../Mini-OTB"
-        self.images_path = self.path + "/Basketball/img"
-        self.annot_file = self.path + "/anno/Basketball.txt"
+        self.images_path = self.path + f"/{trail}/img"
+        self.annot_file = self.path + f"/anno/{trail}.txt"
         self.n_steps = 1
         self.bounding_boxes = []
         self.get_bb()
@@ -37,7 +37,8 @@ class MOSSETracker():
 
             # multiply the filter H by the fourier transform of the image
             G = H * np.fft.fft2(image)
-            G = self.linear_mapping(np.fft.ifft2(G))
+            
+            G = (np.fft.ifft2(G))
             # find the maximum value in the response
             max_val = np.max(G)
             # find the coordinates of the maximum value
@@ -48,8 +49,19 @@ class MOSSETracker():
             print(max_val_pos)
             dx = max_val_pos[1][0] - bb[2] // 2
             dy = max_val_pos[0][0] - bb[3] // 2
+            
+            """
+            response = np.fft.ifft2(G)
+            r, c = np.unravel_index(np.argmax(response), response.shape)
+
+            # # Keep for visualisation
+            # self.last_response = response
+
+            dx = np.mod(r + bb[2] // 2, bb[2]) - bb[2] // 2
+            dy = np.mod(c + bb[3] // 2, bb[3]) - bb[3] // 2
+            """
             # create a new bounding box
-            bb = [bb[0] + dx, bb[1] + dy, bb[2], bb[3]]
+            bb = [np.abs(bb[0] + dx), np.abs(bb[1] + dy), bb[2], bb[3]]
             print(bb)
             # save the new bounding box to the list of bounding boxes
             self.predicted_bounding_boxes.append(bb)
@@ -100,6 +112,10 @@ class MOSSETracker():
         directory.sort()
         image_name = directory[i]
         first_img = cv2.imread(os.path.join(self.images_path, image_name))
+        if self.verbose:
+            cv2.rectangle(first_img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.imshow("image", first_img)
+            cv2.waitKey(0)
         # preprocess the image
         first_img = self.preprocess(first_img)
         # clipping the image 
@@ -160,9 +176,17 @@ class MOSSETracker():
             for i in range(self.n_steps):
                 line = next(f).strip()
                 # separate the numbers in the line and convert them to integers
-                line = [int(x) for x in line.split(',')]
+                try:
+                    line = [int(x) for x in line.split(',')]
+                except:
+                    line = [int(x) for x in re.split(r'\t+', line.rstrip('\t'))]
+                print(line)
                 self.bounding_boxes.append(line)
 
 if __name__ == "__main__":
-    tracker = MOSSETracker()
+    try:
+        trail = sys.argv[1]
+        tracker = MOSSETracker(trail)
+    except:
+        tracker = MOSSETracker()
     tracker.start()
