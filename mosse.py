@@ -45,22 +45,22 @@ class MOSSETracker():
             # get the coordinates of the top left corner of the bounding box
             # the coordinates are calculated using the coordinates of the maximum value
             # and the size of the bounding box
-            print(G)
-            x = max_val_pos[1][0] - bb[2] // 2
-            y = max_val_pos[0][0] - bb[3] // 2
+            print(max_val_pos)
+            dx = max_val_pos[1][0] - bb[2] // 2
+            dy = max_val_pos[0][0] - bb[3] // 2
             # create a new bounding box
-            bb = [x, y, bb[2], bb[3]]
+            bb = [bb[0] + dx, bb[1] + dy, bb[2], bb[3]]
+            print(bb)
             # save the new bounding box to the list of bounding boxes
-            self.predicted_bounding_boxes.append(new_bb)
+            self.predicted_bounding_boxes.append(bb)
             # if verbose is True, show the image with the bounding box
             if self.verbose:
                 image = cv2.imread(os.path.join(self.images_path, image_name))
-                cv2.rectangle(image, (x, y), (x + bb[2], y + bb[3]), (0, 255, 0), 2)
+                cv2.rectangle(image, (bb[0], bb[1]), (bb[0] + bb[2], bb[1] + bb[3]), (0, 255, 0), 2)
                 cv2.imshow("image", image)
                 cv2.waitKey(0)
-                cv2.destroyAllWindows()
             # update the filter H
-            Ai, Bi = self.update_step(image, Ai, Bi, i)
+            # Ai, Bi = self.update_step(image, Ai, Bi, i)
 
     def clip_the_image(self, image:np.ndarray, bb:list = None, step:int = None):
         # clip the image to the size of the bounding box from  
@@ -81,7 +81,7 @@ class MOSSETracker():
     def preprocess(self, image:np.ndarray)->np.ndarray:
         # all the pixels are transformed using log function
         # trun image to grayscale
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.float32)
         image = np.log(image +1)
         image = (image - np.mean(image)) / (np.std(image) + 1e-5)
         print(np.min(image))
@@ -95,6 +95,7 @@ class MOSSETracker():
         # G is the ground truth bounding box
         # function outputs components of filter H - Ai and Bi   
         # first_image - read image i from self.images_path
+        x, y, w, h = self.bounding_boxes[i]
         directory = os.listdir(self.images_path)
         directory.sort()
         image_name = directory[i]
@@ -103,7 +104,6 @@ class MOSSETracker():
         first_img = self.preprocess(first_img)
         # clipping the image 
         # cut out the region of interest from the first image 
-        x, y, w, h = self.bounding_boxes[i]
         G = first_img[y:y+h, x:x+w]
         # get gaussian response
         # G = self._get_gauss_response(self, img, gt)
