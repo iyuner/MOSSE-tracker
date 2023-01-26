@@ -6,11 +6,12 @@ import numpy as np
 
 from cvl.dataset import OnlineTrackingBenchmark
 from cvl.trackers import NCCTracker
+from mosse import MOSSETracker
 
 dataset_path = "Mini-OTB"
 
 SHOW_TRACKING = True
-SEQUENCE_IDX = 4
+SEQUENCE_IDX = 0
 
 if __name__ == "__main__":
 
@@ -21,7 +22,8 @@ if __name__ == "__main__":
     if SHOW_TRACKING:
         cv2.namedWindow("tracker")
 
-    tracker = NCCTracker()
+    # tracker = NCCTracker()
+    tracker = MOSSETracker()
 
     for frame_idx, frame in enumerate(a_seq):
         print(f"{frame_idx} / {len(a_seq)}")
