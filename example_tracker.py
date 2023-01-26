@@ -6,6 +6,7 @@ import numpy as np
 
 from cvl.dataset import OnlineTrackingBenchmark
 from cvl.trackers import NCCTracker
+from mosse import MOSSETracker
 from cvl.features import extract_features, features_to_image
 from cvl.features import FEATURES, FEATURES_NAMES
 
@@ -36,7 +37,8 @@ if __name__ == "__main__":
     if SHOW_TRACKING:
         cv2.namedWindow("tracker")
 
-    tracker = NCCTracker()
+    # tracker = NCCTracker()
+    tracker = MOSSETracker()
 
     for frame_idx, frame in enumerate(a_seq):
         print(f"{frame_idx} / {len(a_seq)}")
