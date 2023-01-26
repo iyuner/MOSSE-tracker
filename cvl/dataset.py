@@ -274,6 +274,7 @@ class OnlineTrackingBenchmark:
             SingleTargetTrackSequence(self.dataset_path, "Walking2", num_frames=500),
             SingleTargetTrackSequence(self.dataset_path, "Walking", num_frames=412),
         ]
+        self.sequence_names = [s.sequence_name for s in self.sequences]
 
     def __getitem__(self, idx):
         return self.sequences[idx]

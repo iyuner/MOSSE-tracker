@@ -1,5 +1,7 @@
+.DS_Store
 __pycache__/
 
 Mini-OTB
 
 results
+cached
