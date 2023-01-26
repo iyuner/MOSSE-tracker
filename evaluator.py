@@ -14,7 +14,7 @@ dataset_path = "Mini-OTB"
 
 SHOW_PER_SEQUENCE_AUC = True
 SHOW_FULL_AUC = False
-REEVAL = False
+REEVAL = True
 
 FEATURES_LIST = [FEATURES.GRAYSCALE, FEATURES.RGB, FEATURES.COLORNAMES, FEATURES.HOG, FEATURES.DAISY,FEATURES.ALEXNET]
 
@@ -30,12 +30,12 @@ def evaluate_method_on_sequence(tracker, feature_type, dataset, sequence_idx):
             image_color = frame['image']
             image = extract_features(image_color, feature_type)
             if frame_idx == 0:
-                bbox = frame['bounding_box']
+                bbox = copy(frame['bounding_box'])
                 if bbox.width % 2 == 0:
                     bbox.width += 1
                 if bbox.height % 2 == 0:
                     bbox.height += 1
-                tracker.start(image, bbox)
+                tracker.start(image, copy(bbox))
             else:
                 tracker.detect(image)
                 tracker.update(image)
