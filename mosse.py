@@ -6,6 +6,9 @@ class MOSSETracker():
     def __init__(self, learning_rate=0.125):
         self.region = None
         self.lr = learning_rate
+        self.init()
+
+    def init(self):
         self.A = 0
         self.B = 0
         self.G = 0 # Gaussian peak in the target
@@ -18,6 +21,7 @@ class MOSSETracker():
     
     def start(self, image, region):
         assert len(image.shape) == 2, "MOSSE is only defined for grayscale images"
+        self.init()
         self.region = region
         image /= 255
         self._pretrain(image)

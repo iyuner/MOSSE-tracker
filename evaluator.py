@@ -8,15 +8,18 @@ from copy import copy
 
 from cvl.dataset import OnlineTrackingBenchmark
 from cvl.trackers import NCCTracker
+from mosse import MOSSETracker
 from cvl.features import FEATURES, FEATURES_NAMES, extract_features
 
 dataset_path = "Mini-OTB"
 
-SHOW_PER_SEQUENCE_AUC = True
-SHOW_FULL_AUC = False
-REEVAL = True
+SHOW_PER_SEQUENCE_AUC = False
+SHOW_FULL_AUC = True
+REEVAL = False
 
-FEATURES_LIST = [FEATURES.GRAYSCALE, FEATURES.RGB, FEATURES.COLORNAMES, FEATURES.HOG, FEATURES.DAISY,FEATURES.ALEXNET]
+TRACKER_LIST = [NCCTracker(), MOSSETracker()]
+
+FEATURES_LIST = [FEATURES.GRAYSCALE]#, FEATURES.RGB, FEATURES.COLORNAMES, FEATURES.HOG, FEATURES.DAISY,FEATURES.ALEXNET]
 
 def evaluate_method_on_sequence(tracker, feature_type, dataset, sequence_idx):
     print(f"{sequence_idx}: {dataset.sequence_names[sequence_idx]}")
@@ -52,32 +55,37 @@ def evaluate_method_on_sequence(tracker, feature_type, dataset, sequence_idx):
 if __name__ == "__main__":
     
     dataset = OnlineTrackingBenchmark(dataset_path)
-    tracker = NCCTracker()
 
     ### Per-sequence AUC curve
     if SHOW_PER_SEQUENCE_AUC:
         for sequence_idx in range(len(dataset.sequences)):
-            for feature_type in FEATURES_LIST:
-                auc, iou = evaluate_method_on_sequence(tracker, feature_type,
-                                                dataset, sequence_idx)
-                label = f"{tracker.__class__.__name__} + {FEATURES_NAMES[feature_type]}"
-                plt.plot(auc/len(dataset[sequence_idx]), '--', label=label)
-                plt.title(f'{dataset.sequence_names[sequence_idx]} ({len(dataset[sequence_idx])} frames)')
+            for tracker in TRACKER_LIST:
+                for feature_type in FEATURES_LIST:
+                    auc, iou = evaluate_method_on_sequence(tracker, feature_type,
+                                                    dataset, sequence_idx)
+                    label = f"{tracker.__class__.__name__} + {FEATURES_NAMES[feature_type]}"
+                    plt.plot(auc/len(dataset[sequence_idx]), '--', label=label)
+                    plt.title(f'{dataset.sequence_names[sequence_idx]} ({len(dataset[sequence_idx])} frames)')
+            plt.xlabel('Frame')
+            plt.ylabel('AUC')
             plt.legend()
             plt.show()
 
     ### Full AUC curve
     if SHOW_FULL_AUC:
-        for feature_type in FEATURES_LIST:
-            iou = []
-            for sequence_idx in range(len(dataset.sequences)):
-                _, iou_seq = evaluate_method_on_sequence(tracker, feature_type,
-                                                dataset, sequence_idx)
-                iou.append(iou_seq)
-            auc = np.cumsum(np.hstack(iou))
-            label = f"{tracker.__class__.__name__} + {FEATURES_NAMES[feature_type]}"
-            total_length = sum([len(d) for d in dataset.sequences])
-            plt.plot(auc/total_length, '--', label=label)
-            plt.title(f'{total_length} frames')
+        for tracker in TRACKER_LIST:
+            for feature_type in FEATURES_LIST:
+                iou = []
+                for sequence_idx in range(len(dataset.sequences)):
+                    _, iou_seq = evaluate_method_on_sequence(tracker, feature_type,
+                                                    dataset, sequence_idx)
+                    iou.append(iou_seq)
+                auc = np.cumsum(np.hstack(iou))
+                label = f"{tracker.__class__.__name__} + {FEATURES_NAMES[feature_type]}"
+                total_length = sum([len(d) for d in dataset.sequences])
+                plt.plot(auc/total_length, '--', label=label)
+                plt.title(f'Mini-OTB ({total_length} frames)')
+        plt.xlabel('Frame')
+        plt.ylabel('AUC')
         plt.legend()
         plt.show()
