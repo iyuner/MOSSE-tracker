@@ -15,7 +15,7 @@ class MOSSETracker():
         self.get_bb()
         self.predicted_bounding_boxes = []
         self.verbose = True
-        self.lr = 0.3
+        self.lr = 0.125
         self.A = 0
         self.B = 0
         self.G = 0 # Gaussian peak in the target
@@ -67,8 +67,6 @@ class MOSSETracker():
                 cv2.imshow("image", image_ori)
                 cv2.waitKey(0)
 
-            # # update the filter H
-            # # Ai, Bi = self.update_step(image, Ai, Bi, i)
             image = cv2.imread(os.path.join(self.images_path, image_name))
             # trun image to grayscale
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255
@@ -83,55 +81,52 @@ class MOSSETracker():
             self.B = self.lr * (Fi) * np.conjugate(Fi) + (1 - self.lr) * self.B
 
     def _clip_the_image(self, image:np.ndarray, bb:list = None, step:int = None):
-        # xpos = bb[0]
-        # ypos = bb[1]
-        # width = bb[2]
-        # height = bb[3]
-
-        # r0 = ypos
-        # r1 = ypos + height
-        # c0 = xpos
-        # c1 = xpos + width
-
-        # ri0 = r0
-        # ri1 = r1
-        # rp0 = 0
-        # rp1 = height
-
-        # ci0 = c0
-        # ci1 = c1
-        # cp0 = 0
-        # cp1 = width
-
-        # if c0 < 0:
-        #     ci0 = 0
-        #     cp0 = -c0
-
-        # if r0 < 0:
-        #     ri0 = 0
-        #     rp0 = -r0
-
-        # if r1 >= image.shape[0]:
-        #     ri1 = image.shape[0]
-        #     rp1 = height - (r1 - image.shape[0])
-
-        # if c1 >= image.shape[1]:
-        #     ci1 = image.shape[1]
-        #     cp1 = width - (c1 - image.shape[1])
-
-        # patch = np.zeros(shape=(height, width),
-        #                 dtype=image.dtype)
-
-        # patch[rp0:rp1, cp0:cp1] = image[ri0:ri1, ci0:ci1]
-
-        # assert patch.shape == (height, width)
-
-        # return patch
-        
         # clip the image to the size of the bounding box from  
         if bb is not None:
-            image = image[bb[1]:bb[1] + bb[3], bb[0]:bb[0] + bb[2]]
-            return image
+            xpos = bb[0]
+            ypos = bb[1]
+            width = bb[2]
+            height = bb[3]
+
+            r0 = ypos
+            r1 = ypos + height
+            c0 = xpos
+            c1 = xpos + width
+
+            ri0 = r0
+            ri1 = r1
+            rp0 = 0
+            rp1 = height
+
+            ci0 = c0
+            ci1 = c1
+            cp0 = 0
+            cp1 = width
+
+            if c0 < 0:
+                ci0 = 0
+                cp0 = -c0
+
+            if r0 < 0:
+                ri0 = 0
+                rp0 = -r0
+
+            if r1 >= image.shape[0]:
+                ri1 = image.shape[0]
+                rp1 = height - (r1 - image.shape[0])
+
+            if c1 >= image.shape[1]:
+                ci1 = image.shape[1]
+                cp1 = width - (c1 - image.shape[1])
+
+            patch = np.zeros(shape=(height, width),
+                            dtype=image.dtype)
+
+            patch[rp0:rp1, cp0:cp1] = image[ri0:ri1, ci0:ci1]
+
+            assert patch.shape == (height, width)
+
+            return patch
         elif step is not None:
             x, y, w, h = self.bounding_boxes[step]
             image = image[y:y+h, x:x+w]
@@ -168,6 +163,12 @@ class MOSSETracker():
         # get gaussian response
         self.G = np.fft.fft2(self._get_gauss(w, h))
         
+        fi = self.preprocess(img)
+        Fi = np.fft.fft2(fi)
+        self.A += self.G * np.conj(Fi)
+        self.B += Fi * np.conjugate(Fi)
+
+        # do several small affine pertubations
         for i in range(self.n_affine):
             fi = self.preprocess(self._random_affine(img))
             Fi = np.fft.fft2(fi)
@@ -204,8 +205,8 @@ class MOSSETracker():
 
     def _random_affine(self, img):
         # add small affine pertubation
-        angle = (np.random.rand() - 0.5) * 0.2   # random angle from [-0.01, 0.01) degree
-        scale = np.random.rand() * 0.04 + 0.98   # random scale from [0.98, 1.02)
+        angle = (np.random.rand() - 0.5) * 20   # random angle from [-10, 10) degree
+        scale = np.random.rand() * 0.2 + 0.9   # random scale from [0.9, 1.1)
         center = (img.shape[1]//2, img.shape[0]//2)
         rot_mat = cv2.getRotationMatrix2D(center, angle, scale)
         warp_img = cv2.warpAffine(img, rot_mat, (img.shape[1], img.shape[0]), cv2.BORDER_REFLECT)
