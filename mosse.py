@@ -19,16 +19,16 @@ class MOSSETracker():
         region = self.region
         return crop_patch(image, region)
     
-    def start(self, image, region):
-        assert len(image.shape) == 2, "MOSSE is only defined for grayscale images"
+    def start(self, image_, region):
+        assert len(image_.shape) == 2, "MOSSE is only defined for grayscale images"
         self.init()
         self.region = region
-        image /= 255
+        image = image_ / 255
         self._pretrain(image)
 
-    def detect(self, image):
-        assert len(image.shape) == 2, "MOSSE is only defined for grayscale images"
-        image /= 255
+    def detect(self, image_):
+        assert len(image_.shape) == 2, "MOSSE is only defined for grayscale images"
+        image = image_ / 255  # using image/=255 would be applied both in update and detect!
         H = self.A / self.B
         image = self.crop_patch(image)
         # preprocess the image
@@ -37,6 +37,10 @@ class MOSSETracker():
         # multiply the filter H by the fourier transform of the image
         G = H * np.fft.fft2(image)
         Gi = np.real(np.fft.ifft2(G))
+
+        #if len(patch.shape) == 3:
+        #    Gi = Gi.sum(2)
+
         r, c = np.unravel_index(np.argmax(Gi), Gi.shape)
         # get the coordinates of the top left corner of the bounding box
         # the coordinates are calculated using the coordinates of the maximum value
@@ -48,8 +52,8 @@ class MOSSETracker():
         self.region.ypos += dy
         return self.region
     
-    def update(self, image):
-        image /= 255
+    def update(self, image_):
+        image = image_ / 255  # using image/=255 would be applied both in update and detect!
         image = self.crop_patch(image)
         # preprocess the image
         image = self._preprocess(image).astype(np.float32)
@@ -77,12 +81,12 @@ class MOSSETracker():
     
     def _get_gauss(self, w, h):
         xs, ys = np.meshgrid(np.arange(w), np.arange(h))
-        c = np.exp( - ((xs - w/2)**2 + (ys - h/2)**2) / (2 * self.sigma**2) )
+        c = np.exp( - ((xs - (w-1)/2)**2 + (ys - (h-1)/2)**2) / (2 * self.sigma**2))
         return c
     
     def _preprocess(self, image:np.ndarray)->np.ndarray:
         # all the pixels are transformed using log function
-        image = np.log(image +1)
+        image = np.log(image + 1)
         image = (image - np.mean(image)) / (np.std(image) + 1e-5)
         # the image is normalized
         # the image is multiplied by a cosine window to reduce the effect of the border
