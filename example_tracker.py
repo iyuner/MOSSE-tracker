@@ -3,19 +3,22 @@
 import cv2
 
 import numpy as np
+from copy import copy
 
 from cvl.dataset import OnlineTrackingBenchmark
-from cvl.trackers import NCCTracker
+from cvl.trackers import NCCTracker, ImprovedMOSSETracker
 from mosse import MOSSETracker
 from cvl.features import extract_features, features_to_image
 from cvl.features import FEATURES, FEATURES_NAMES
 
 dataset_path = "Mini-OTB"
 
-DEBUG = True
+DEBUG = False
 SHOW_TRACKING = True
-SEQUENCE_IDX = 5
+SEQUENCE_IDX = 20 # 23
 FEATURE_TYPE = FEATURES.RGB
+
+TRACKER_COLORS = [(0,255,0),(255,0,0),(0,0,255)]
 
 def fit_size(img, tsize=None, fit_height=True):
     dsize = (int(img.shape[1] * tsize[0] / img.shape[0]), tsize[0]) if fit_height else (tsize[1], int(img.shape[0] * tsize[1] / img.shape[1]))
@@ -37,26 +40,30 @@ if __name__ == "__main__":
     if SHOW_TRACKING:
         cv2.namedWindow("tracker")
 
-    # tracker = NCCTracker()
-    tracker = MOSSETracker()
+    trackers = [ImprovedMOSSETracker(), NCCTracker()]#, MOSSETracker()]
+    trackers_colors = TRACKER_COLORS[:len(trackers)]
 
     for frame_idx, frame in enumerate(a_seq):
         print(f"{frame_idx} / {len(a_seq)}")
         image_color = frame['image']
         image = extract_features(image_color, FEATURE_TYPE)
 
-        if frame_idx == 0:
-            bbox = frame['bounding_box']
-            if bbox.width % 2 == 0:
-                bbox.width += 1
 
-            if bbox.height % 2 == 0:
-                bbox.height += 1
+        for tracker in trackers:
+            inp_image = copy(image)
+            
+            if frame_idx == 0:
+                bbox = frame['bounding_box']
+                if bbox.width % 2 == 0:
+                    bbox.width += 1
 
-            tracker.start(image, bbox)
-        else:
-            tracker.detect(image)
-            tracker.update(image)
+                if bbox.height % 2 == 0:
+                    bbox.height += 1
+                
+                tracker.start(inp_image, copy(bbox))
+            else:
+                tracker.detect(inp_image)
+                tracker.update(inp_image)
         
         if DEBUG:
             N_CHANNELS = 4
@@ -90,7 +97,8 @@ if __name__ == "__main__":
 
         elif SHOW_TRACKING:
             image_color = cv2.cvtColor(image_color, cv2.COLOR_RGB2BGR)
-            draw_bbox(image_color, tracker.region, color=(0, 255, 0))
+            for tracker, color in zip(trackers, trackers_colors):
+                draw_bbox(image_color, tracker.region, color=color)
             cv2.imshow("tracker", image_color)
             key = cv2.waitKey(0)
             if key==ord('q'):

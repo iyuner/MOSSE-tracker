@@ -11,7 +11,7 @@ from torchvision import transforms
 if torch.__version__ == "1.2.0":
     from torchvision.models.utils import load_state_dict_from_url
 else:
-    from torch.utils.model_zoo import load_url
+    from torch.utils.model_zoo import load_url as load_state_dict_from_url
 
 class FEATURES:
     GRAYSCALE = 1
