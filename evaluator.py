@@ -5,24 +5,26 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 from copy import copy
+from sklearn.metrics import precision_recall_curve, average_precision_score
 
 from cvl.dataset import OnlineTrackingBenchmark
-from cvl.trackers import NCCTracker
+from cvl.trackers import NCCTracker, ImprovedMOSSETracker
 from mosse import MOSSETracker
 from cvl.features import FEATURES, FEATURES_NAMES, extract_features
 
+
 dataset_path = "Mini-OTB"
 
-SHOW_PER_SEQUENCE_AUC = False
-SHOW_FULL_AUC = True
+SAVE_AP_MIOU_TABLE = True
+SHOW_PER_SEQUENCE_AUC = True
+SHOW_FULL_AUC = False
 REEVAL = False
+TRACKER_LIST = [NCCTracker(), ImprovedMOSSETracker()]#, MOSSETracker()] 
 
-TRACKER_LIST = [NCCTracker(), MOSSETracker()]
-
-FEATURES_LIST = [FEATURES.GRAYSCALE]#, FEATURES.RGB, FEATURES.COLORNAMES, FEATURES.HOG, FEATURES.DAISY,FEATURES.ALEXNET]
+FEATURES_LIST = [FEATURES.GRAYSCALE, FEATURES.RGB]#, FEATURES.COLORNAMES, FEATURES.HOG, FEATURES.DAISY,FEATURES.ALEXNET]
 
 def evaluate_method_on_sequence(tracker, feature_type, dataset, sequence_idx):
-    print(f"{sequence_idx}: {dataset.sequence_names[sequence_idx]}")
+    # print(f"{sequence_idx}: {dataset.sequence_names[sequence_idx]}")
     method = f"{tracker.__class__.__name__}_{FEATURES_NAMES[feature_type]}"
     filename = f"cached/{method}/{dataset.sequence_names[sequence_idx]}.npy"
     if not os.path.exists(filename) or REEVAL:
@@ -56,16 +58,39 @@ if __name__ == "__main__":
     
     dataset = OnlineTrackingBenchmark(dataset_path)
 
+    ### AP & mIoU Table
+    if SAVE_AP_MIOU_TABLE:
+        for tracker in TRACKER_LIST:
+            for feature_type in FEATURES_LIST:
+                tracker_id = f"{tracker.__class__.__name__}_{FEATURES_NAMES[feature_type]}"
+                filename = f"./results/{tracker_id}.txt"
+                data = []
+                for sequence_idx in range(len(dataset.sequences)):
+                    auc, iou = evaluate_method_on_sequence(tracker, feature_type,dataset, sequence_idx)
+                    AP = 0
+                    iou_thresholds = np.arange(0,1,0.05)
+                    for threshold in iou_thresholds:
+                        AP += sum(iou >= threshold) / iou.shape[0]
+                    AP /= iou_thresholds.shape[0]
+                    mIOU = iou.mean()
+                    print(f'{sequence_idx}: Average precision: {AP*100:.2f}%, Mean IoU: {mIOU*100:.2f}%, # Frames: {len(dataset[sequence_idx])}')
+                    data.append([sequence_idx, len(dataset[sequence_idx]), mIOU*100, AP*100])
+                    np.savetxt(filename, np.array(data), fmt=['%2d', '%5.2f','%5.2f','%d'], delimiter=' & ')
+            A = np.array(data)
+            B = A.mean(0)
+            B[0] = -1
+            B[1] = -1
+            np.savetxt(filename, np.vstack([A,B]), fmt=['%2d', '%4d', '%5.2f','%5.2f'], delimiter=' & ')
+
     ### Per-sequence AUC curve
     if SHOW_PER_SEQUENCE_AUC:
         for sequence_idx in range(len(dataset.sequences)):
             for tracker in TRACKER_LIST:
                 for feature_type in FEATURES_LIST:
-                    auc, iou = evaluate_method_on_sequence(tracker, feature_type,
-                                                    dataset, sequence_idx)
+                    auc, iou = evaluate_method_on_sequence(tracker, feature_type,dataset, sequence_idx)
                     label = f"{tracker.__class__.__name__} + {FEATURES_NAMES[feature_type]}"
                     plt.plot(auc/len(dataset[sequence_idx]), '--', label=label)
-                    plt.title(f'{dataset.sequence_names[sequence_idx]} ({len(dataset[sequence_idx])} frames)')
+                    plt.title(f'#{sequence_idx}: {dataset.sequence_names[sequence_idx]} ({len(dataset[sequence_idx])} frames)')
             plt.xlabel('Frame')
             plt.ylabel('AUC')
             plt.legend()
